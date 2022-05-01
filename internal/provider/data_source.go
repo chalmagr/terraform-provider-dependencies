@@ -35,6 +35,11 @@ func dataSourceDependencyNexusRaw() *schema.Resource {
 				Type:     schema.TypeString,
 				Required: true,
 			},
+			"basic_auth": {
+				Type:      schema.TypeString,
+				Optional:  true,
+				Sensitive: true,
+			},
 			"username": {
 				Type:     schema.TypeString,
 				Optional: true,
@@ -104,7 +109,7 @@ type SearchResponse struct {
 	ContinuationToken string
 }
 
-func searchRawRepo(ctx context.Context, client *http.Client, server string, repository string, name string, username string, password string) (res *Asset, err error) {
+func searchRawRepo(ctx context.Context, client *http.Client, server string, repository string, name string, authentication string) (res *Asset, err error) {
 
 	url := fmt.Sprintf("https://%s/service/rest/v1/search?name=%s&repository=%s", server, url.QueryEscape(name), repository)
 
@@ -117,8 +122,9 @@ func searchRawRepo(ctx context.Context, client *http.Client, server string, repo
 
 	tflog.Debug(ctx, "Got response back")
 
-	if username != "" && password != "" {
-		req.Header.Add("Authorization", fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))))
+	if authentication != "" {
+		req.Header.Add("Authorization", fmt.Sprintf("Basic %s", authentication))
+
 	}
 
 	resp, err := client.Do(req)
@@ -174,10 +180,28 @@ func dataSourceDependencyNexusRawRead(ctx context.Context, d *schema.ResourceDat
 	username := d.Get("username").(string)
 	password := d.Get("password").(string)
 	repository := "raw-trusted"
+	authentication := d.Get("basic_auth").(string)
 
 	client := &http.Client{}
 
-	asset, err := searchRawRepo(ctx, client, server, repository, name, username, password)
+	if username != "" && password != "" {
+		if authentication == "" {
+			tflog.Debug(ctx, "Will use authentication with username/password: "+username+"/****")
+			authentication = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
+		} else {
+			return append(diags, diag.Errorf("Cannot provide authentication as well as username/password")...)
+		}
+	} else if username != "" || password != "" {
+		return append(diags, diag.Errorf("Please provide both username/password or none")...)
+	} else if authentication != "" {
+		tflog.Debug(ctx, "Will use authentication with base64 token")
+		_, err := base64.StdEncoding.DecodeString(authentication)
+		if err != nil {
+			return append(diags, diag.Errorf("Provided basic_auth is not a valid base64 string", err)...)
+		}
+	}
+
+	asset, err := searchRawRepo(ctx, client, server, repository, name, authentication)
 
 	if err != nil {
 		return append(diags, diag.Errorf("Error retrieving asset information: %s", err)...)

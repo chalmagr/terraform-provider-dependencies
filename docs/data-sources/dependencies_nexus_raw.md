@@ -33,6 +33,8 @@ The following arguments are supported:
 
 * `destination` - (Required) The directory where the file will be saved.
 
+* `basic_auth` - (Optional) The basic authentication header. i.e.: base64("${username}:${password}")
+
 * `username` - (Optional) The username to use when authentication is required. (Only used if password is given as well)
 
 * `password` - (Optional) The password to use when authentication is required. (Only used if username is given as well)
