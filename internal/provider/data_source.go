@@ -79,13 +79,14 @@ func dataSourceDependencyNexusRaw() *schema.Resource {
 }
 
 type Asset struct {
-	DownloadUrl string
-	Path        string
-	Id          string
-	Repository  string
-	Format      string
-	Checksum    map[string]string
-	ContentType string
+	DownloadUrl  string
+	Path         string
+	Id           string
+	Repository   string
+	Format       string
+	Checksum     map[string]string
+	ContentType  string
+	LastModified string
 }
 
 type Tag struct {
@@ -93,25 +94,14 @@ type Tag struct {
 	Value string
 }
 
-type Item struct {
-	Id         string
-	Repository string
-	Format     string
-	Group      string
-	Name       string
-	// Version    string
-	Assets []Asset
-	// Tags       []Tag
-}
-
-type SearchResponse struct {
-	Items             []Item
+type SearchAssetsResponse struct {
+	Items             []Asset
 	ContinuationToken string
 }
 
 func searchRawRepo(ctx context.Context, client *http.Client, server string, repository string, name string, authentication string) (res *Asset, err error) {
 
-	url := fmt.Sprintf("https://%s/service/rest/v1/search?name=%s&repository=%s", server, url.QueryEscape(name), repository)
+	url := fmt.Sprintf("https://%s/service/rest/v1/search/assets?name=%s&repository=%s", server, url.QueryEscape(name), repository)
 
 	tflog.Debug(ctx, fmt.Sprintf("Sending request %s", url))
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -145,7 +135,7 @@ func searchRawRepo(ctx context.Context, client *http.Client, server string, repo
 		return nil, errors.New(fmt.Sprintf("Invalid Content-Type in response. Expected application/json but got %s", contentType))
 	}
 
-	var searchResponse SearchResponse
+	var searchResponse SearchAssetsResponse
 
 	err = json.NewDecoder(resp.Body).Decode(&searchResponse)
 
@@ -158,18 +148,10 @@ func searchRawRepo(ctx context.Context, client *http.Client, server string, repo
 	})
 
 	if len(searchResponse.Items) != 1 {
-		return nil, errors.New(fmt.Sprintf("Failed to find exactly one item (Got %d)", len(searchResponse.Items)))
+		return nil, errors.New(fmt.Sprintf("Failed to find exactly one asset (Got %d)", len(searchResponse.Items)))
 	}
 
-	assets := searchResponse.Items[0].Assets
-
-	if len(assets) != 1 {
-		return nil, errors.New(fmt.Sprintf("Failed to find exactly one asset (Got %d)", len(assets)))
-	}
-
-	res = &assets[0]
-
-	return &assets[0], nil
+	return &(searchResponse.Items[0]), nil
 }
 
 func dataSourceDependencyNexusRawRead(ctx context.Context, d *schema.ResourceData, meta interface{}) (diags diag.Diagnostics) {
@@ -197,7 +179,7 @@ func dataSourceDependencyNexusRawRead(ctx context.Context, d *schema.ResourceDat
 		tflog.Debug(ctx, "Will use authentication with base64 token")
 		_, err := base64.StdEncoding.DecodeString(authentication)
 		if err != nil {
-			return append(diags, diag.Errorf("Provided basic_auth is not a valid base64 string", err)...)
+			return append(diags, diag.Errorf("Provided basic_auth is not a valid base64 string")...)
 		}
 	}
 

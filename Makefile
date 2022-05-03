@@ -1,28 +1,31 @@
 TEST?=$$(go list ./... | grep -v 'vendor')
 NAMESPACE=chalmagr
 NAME=dependencies
+VERSION=$(shell cat version.txt)
+OS=$(shell go env GOHOSTOS)
+ARCH=$(shell go env GOHOSTARCH)
+OS_ARCH=${OS}_${ARCH}
 BINARY=terraform-provider-${NAME}
-VERSION=0.2
-OS_ARCH=linux_amd64
 
 default: install
 
 build:
-	go build -o ${BINARY}
+	GOOS=${OS} GOARCH=${ARCH} go build -o ${BINARY}_${OS}_${ARCH}
 
 release:
-	GOOS=darwin GOARCH=amd64 go build -o ./bin/${BINARY}_${VERSION}_darwin_amd64
-	GOOS=freebsd GOARCH=386 go build -o ./bin/${BINARY}_${VERSION}_freebsd_386
-	GOOS=freebsd GOARCH=amd64 go build -o ./bin/${BINARY}_${VERSION}_freebsd_amd64
-	GOOS=freebsd GOARCH=arm go build -o ./bin/${BINARY}_${VERSION}_freebsd_arm
-	GOOS=linux GOARCH=386 go build -o ./bin/${BINARY}_${VERSION}_linux_386
-	GOOS=linux GOARCH=amd64 go build -o ./bin/${BINARY}_${VERSION}_linux_amd64
-	GOOS=linux GOARCH=arm go build -o ./bin/${BINARY}_${VERSION}_linux_arm
-	GOOS=openbsd GOARCH=386 go build -o ./bin/${BINARY}_${VERSION}_openbsd_386
-	GOOS=openbsd GOARCH=amd64 go build -o ./bin/${BINARY}_${VERSION}_openbsd_amd64
-	GOOS=solaris GOARCH=amd64 go build -o ./bin/${BINARY}_${VERSION}_solaris_amd64
-	GOOS=windows GOARCH=386 go build -o ./bin/${BINARY}_${VERSION}_windows_386
-	GOOS=windows GOARCH=amd64 go build -o ./bin/${BINARY}_${VERSION}_windows_amd64
+	GOOS=darwin GOARCH=amd64 go build -o ./bin/darwin_amd64/${BINARY}_v${VERSION}_x5
+	GOOS=freebsd GOARCH=386 go build -o ./bin/freebsd_386/${BINARY}_v${VERSION}_x5
+	GOOS=freebsd GOARCH=amd64 go build -o ./bin/freebsd_amd64/${BINARY}_v${VERSION}_x5
+	GOOS=freebsd GOARCH=arm go build -o ./bin/freebsd_arm/${BINARY}_v${VERSION}_x5
+	GOOS=linux GOARCH=386 go build -o ./bin/linux_386/${BINARY}_v${VERSION}_x5
+	GOOS=linux GOARCH=amd64 go build -o ./bin/linux_amd64/${BINARY}_v${VERSION}_x5
+	GOOS=linux GOARCH=arm go build -o ./bin/linux_arm/${BINARY}_v${VERSION}_x5
+	GOOS=openbsd GOARCH=386 go build -o ./bin/openbsd_386/${BINARY}_v${VERSION}_x5
+	GOOS=openbsd GOARCH=amd64 go build -o ./bin/openbsd_amd64/${BINARY}_v${VERSION}_x5
+	GOOS=solaris GOARCH=amd64 go build -o ./bin/solaris_amd64/${BINARY}_v${VERSION}_x5
+	GOOS=windows GOARCH=386 go build -o ./bin/windows_386/${BINARY}_v${VERSION}_x5
+	GOOS=windows GOARCH=amd64 go build -o ./bin/windows_amd64/${BINARY}_v${VERSION}_x5
+
 
 install: build
 	mkdir -p ~/.terraform.d/plugins/${OS_ARCH}
