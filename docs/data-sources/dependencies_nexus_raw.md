@@ -33,11 +33,11 @@ The following arguments are supported:
 
 * `destination` - (Required) The directory where the file will be saved.
 
-* `basic_auth` - (Optional) The basic authentication header. i.e.: base64("${username}:${password}")
+* `basic_auth` - (Optional) The basic authentication header **base64 encoded** without "Basic " prefix, i.e.: base64("${username}:${password}"). May also be stored in Secret Manager and referenced with gcp_secret!projects/`project`/secrets/`secret-name`/versions/`version`.
 
 * `username` - (Optional) The username to use when authentication is required. (Only used if password is given as well)
 
-* `password` - (Optional) The password to use when authentication is required. (Only used if username is given as well)
+* `password` - (Optional) The password to use when authentication is required. (Only used if username is given as well). May also be stored in Secret Manager and referenced with gcp_secret!projects/`project`/secrets/`secret-name`/versions/`version`.
 
 ## Attributes Reference
 

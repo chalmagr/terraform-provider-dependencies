@@ -164,10 +164,10 @@ func searchRawRepo(ctx context.Context, client *http.Client, server string, repo
 	return &(searchResponse.Items[0]), nil
 }
 
-func resolvePassword(ctx context.Context, password string) (string, error) {
-	if strings.HasPrefix(password, "gcp_secret!") {
-		secret := strings.Replace(password, "gcp_secret!", "", 1)
-		tflog.Debug(ctx, "Will read password from GCP Secret")
+func resolveSecret(ctx context.Context, secretData string) (string, error) {
+	if strings.HasPrefix(secretData, "gcp_secret!") {
+		secretData = strings.Replace(secretData, "gcp_secret!", "", 1)
+		tflog.Debug(ctx, "Will read secret from GCP")
 
 		client, err := secretmanager.NewClient(ctx)
 		if err != nil {
@@ -176,16 +176,16 @@ func resolvePassword(ctx context.Context, password string) (string, error) {
 		defer client.Close()
 
 		accessRequest := &secretmanagerpb.AccessSecretVersionRequest{
-			Name: secret,
+			Name: secretData,
 		}
 
 		result, err := client.AccessSecretVersion(ctx, accessRequest)
 		if err != nil {
 			return "", err
 		}
-		password = string(result.GetPayload().GetData())
+		secretData = string(result.GetPayload().GetData())
 	}
-	return password, nil
+	return secretData, nil
 }
 
 func dataSourceDependencyNexusRawRead(ctx context.Context, d *schema.ResourceData, meta interface{}) (diags diag.Diagnostics) {
@@ -204,11 +204,11 @@ func dataSourceDependencyNexusRawRead(ctx context.Context, d *schema.ResourceDat
 	if username != "" && password != "" {
 		if authentication == "" {
 			tflog.Debug(ctx, "Will use username/password authentication ("+username+"/***")
-			resolvedPassword, err := resolvePassword(ctx, password)
+			secretValue, err := resolveSecret(ctx, password)
 			if err != nil {
-				return append(diags, diag.Errorf("Failed to resolve password: %s", err)...)
+				return append(diags, diag.Errorf("Failed to resolve password secret: %s", err)...)
 			}
-			password = resolvedPassword
+			password = secretValue
 			authentication = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 		} else {
 			return append(diags, diag.Errorf("Cannot provide authentication as well as username/password")...)
@@ -217,7 +217,13 @@ func dataSourceDependencyNexusRawRead(ctx context.Context, d *schema.ResourceDat
 		return append(diags, diag.Errorf("Please provide both username/password or none")...)
 	} else if authentication != "" {
 		tflog.Debug(ctx, "Will use authentication with base64 token")
-		_, err := base64.StdEncoding.DecodeString(authentication)
+		secretValue, err := resolveSecret(ctx, authentication)
+		if err != nil {
+			return append(diags, diag.Errorf("Failed to resolve authentication secret: %s", err)...)
+		}
+		authentication = secretValue
+
+		_, err = base64.StdEncoding.DecodeString(authentication)
 		if err != nil {
 			return append(diags, diag.Errorf("Provided basic_auth is not a valid base64 string")...)
 		}
