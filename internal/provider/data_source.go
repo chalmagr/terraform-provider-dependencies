@@ -12,10 +12,14 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+
+	secretmanager "cloud.google.com/go/secretmanager/apiv1"
+	secretmanagerpb "google.golang.org/genproto/googleapis/cloud/secretmanager/v1"
 )
 
 func dataSourceDependencyNexusRaw() *schema.Resource {
@@ -39,6 +43,9 @@ func dataSourceDependencyNexusRaw() *schema.Resource {
 				Type:      schema.TypeString,
 				Optional:  true,
 				Sensitive: true,
+				StateFunc: func(val interface{}) string {
+					return "*** sensitive ***"
+				},
 			},
 			"username": {
 				Type:     schema.TypeString,
@@ -48,6 +55,9 @@ func dataSourceDependencyNexusRaw() *schema.Resource {
 				Type:      schema.TypeString,
 				Optional:  true,
 				Sensitive: true,
+				StateFunc: func(val interface{}) string {
+					return "*** sensitive ***"
+				},
 			},
 
 			"asset_id": {
@@ -154,21 +164,51 @@ func searchRawRepo(ctx context.Context, client *http.Client, server string, repo
 	return &(searchResponse.Items[0]), nil
 }
 
+func resolvePassword(ctx context.Context, password string) (string, error) {
+	if strings.HasPrefix(password, "gcp_secret!") {
+		secret := strings.Replace(password, "gcp_secret!", "", 1)
+		tflog.Debug(ctx, "Will read password from GCP Secret")
+
+		client, err := secretmanager.NewClient(ctx)
+		if err != nil {
+			return "", err
+		}
+		defer client.Close()
+
+		accessRequest := &secretmanagerpb.AccessSecretVersionRequest{
+			Name: secret,
+		}
+
+		result, err := client.AccessSecretVersion(ctx, accessRequest)
+		if err != nil {
+			return "", err
+		}
+		password = string(result.GetPayload().GetData())
+	}
+	return password, nil
+}
+
 func dataSourceDependencyNexusRawRead(ctx context.Context, d *schema.ResourceData, meta interface{}) (diags diag.Diagnostics) {
 
 	server := d.Get("nexus_server").(string)
 	name := d.Get("name").(string)
 	directory := d.Get("destination").(string)
+	repository := "raw-trusted"
+
 	username := d.Get("username").(string)
 	password := d.Get("password").(string)
-	repository := "raw-trusted"
 	authentication := d.Get("basic_auth").(string)
 
 	client := &http.Client{}
 
 	if username != "" && password != "" {
 		if authentication == "" {
-			tflog.Debug(ctx, "Will use authentication with username/password: "+username+"/****")
+			tflog.Debug(ctx, "Will use username/password authentication ("+username+"/***")
+			resolvedPassword, err := resolvePassword(ctx, password)
+			if err != nil {
+				return append(diags, diag.Errorf("Failed to resolve password: %s", err)...)
+			}
+			password = resolvedPassword
 			authentication = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 		} else {
 			return append(diags, diag.Errorf("Cannot provide authentication as well as username/password")...)
@@ -243,9 +283,9 @@ func dataSourceDependencyNexusRawRead(ctx context.Context, d *schema.ResourceDat
 	if err != nil {
 		return append(diags, diag.Errorf("Error creating request: %s", err)...)
 	}
-	if username != "" && password != "" {
-		tflog.Trace(ctx, "Adding authentication header with username/password")
-		req.Header.Add("Authorization", fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))))
+	if authentication != "" {
+		tflog.Trace(ctx, "Adding authentication header")
+		req.Header.Add("Authorization", fmt.Sprintf("Basic %s", authentication))
 	}
 
 	tflog.Trace(ctx, "Sending request to server...")

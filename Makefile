@@ -10,7 +10,7 @@ BINARY=terraform-provider-${NAME}
 default: install
 
 build:
-	GOOS=${OS} GOARCH=${ARCH} go build -o ${BINARY}_${OS}_${ARCH}
+	GOOS=${OS} GOARCH=${ARCH} go build -o ./bin/${OS}_${ARCH}/${BINARY}_v${VERSION}_x5
 
 release:
 	GOOS=darwin GOARCH=amd64 go build -o ./bin/darwin_amd64/${BINARY}_v${VERSION}_x5
