@@ -13,7 +13,7 @@ The `dependencies_nexus_raw` data source makes HTTPS GET requests to the given N
 ```hcl
 data "dependencies_nexus_raw" "dependency" {
   nexus_server = "repository.company.com"
-  name = "com/company/product.exe
+  name = "com/company/product.exe"
   destination = "${path.root}/dependencies"
   
   # Optional authentication information
